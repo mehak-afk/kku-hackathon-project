@@ -1,88 +1,38 @@
 (() => {
   "use strict";
-  const STORAGE_KEY = "offer-compass-values-v1";
-  const inputs = [...document.querySelectorAll("input[data-group][data-key]")];
-  const output = (name) => document.querySelector(`[data-output="${name}"]`);
-  const liveStatus = document.querySelector("#live-status");
-
-  function formatMoney(cents) {
-    const sign = cents < 0 ? "-" : "";
-    const absolute = Math.abs(cents);
-    return `${sign}$${(absolute / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const data = window.cvData;
+  if (!data) { document.body.innerHTML = "<p>Sample CV data could not be loaded.</p>"; return; }
+  const STORAGE_KEY = "bilingual-cv-locale";
+  const COPY = {
+    en: { downloadPdf: "Download PDF", portfolioLabel: "Bilingual CV · Portfolio", education: "Education", skills: "Skills", experience: "Experience", selectedProjects: "Selected projects", footerNote: "Editable sample template · Replace details in sample-data/data.js", availability: "Available for thoughtful opportunities", printNote: "Save as PDF in the print dialog. For the cleanest result, turn off headers and footers.", email: "Email", location: "Location", showing: c => `Showing ${c} ${c === 1 ? "project" : "projects"}.`, noProjects: "No projects in this category yet." },
+    ar: { downloadPdf: "تنزيل PDF", portfolioLabel: "سيرة ذاتية ثنائية اللغة · معرض أعمال", education: "التعليم", skills: "المهارات", experience: "الخبرة", selectedProjects: "مشاريع مختارة", footerNote: "نموذج قابل للتعديل · استبدل البيانات في sample-data/data.js", availability: "متاح لفرص ملهمة", printNote: "اختر «حفظ بصيغة PDF» من نافذة الطباعة. لأفضل نتيجة، أوقف الرؤوس والتذييلات.", email: "البريد الإلكتروني", location: "الموقع", showing: c => `عرض ${c} ${c === 1 ? "مشروع" : "مشاريع"}.`, noProjects: "لا توجد مشاريع في هذه الفئة حتى الآن." }
+  };
+  const state = { locale: loadLocale(), filter: "all" };
+  const $ = s => document.querySelector(s);
+  const el = { name: $("#profileName"), headline: $("#profileHeadline"), summary: $("#profileSummary"), contact: $("#contactList"), education: $("#educationList"), skills: $("#skillsList"), experience: $("#experienceList"), projects: $("#projectsGrid"), filters: $("#projectFilters"), status: $("#projectStatus"), print: $("#printButton") };
+  function loadLocale() { try { return localStorage.getItem(STORAGE_KEY) === "ar" ? "ar" : "en"; } catch (_) { return "en"; } }
+  function saveLocale() { try { localStorage.setItem(STORAGE_KEY, state.locale); } catch (_) {} }
+  function text(value) { return value?.[state.locale] ?? ""; }
+  function put(node, value) { node.textContent = value; return node; }
+  function renderCopy() {
+    const c = COPY[state.locale]; document.documentElement.lang = state.locale; document.documentElement.dir = state.locale === "ar" ? "rtl" : "ltr"; document.title = state.locale === "ar" ? "قالب السيرة الذاتية ومعرض الأعمال" : "CV Portfolio Template";
+    document.querySelectorAll("[data-copy]").forEach(n => put(n, c[n.dataset.copy]));
+    document.querySelector(".language-switch").setAttribute("aria-label", state.locale === "ar" ? "اختر اللغة" : "Choose language");
+    document.querySelectorAll(".language-button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.locale === state.locale)));
+    el.print.setAttribute("aria-label", state.locale === "ar" ? "تنزيل PDF: يفتح نافذة الطباعة" : "Download PDF: opens the print dialog");
   }
-  function parseCents(value) {
-    const text = value.trim();
-    if (!text) return { valid: false, message: "Enter an amount." };
-    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) return { valid: false, message: "Use a non-negative number with up to 2 decimal places." };
-    const [whole, fraction = ""] = text.split(".");
-    const cents = Number(whole) * 100 + Number((fraction + "00").slice(0, 2));
-    return Number.isSafeInteger(cents) ? { valid: true, cents } : { valid: false, message: "Enter a smaller amount." };
+  function renderProfile() {
+    const c = COPY[state.locale]; put(el.name, text(data.profile.name)); put(el.headline, text(data.profile.headline)); put(el.summary, text(data.profile.summary)); el.contact.replaceChildren();
+    const email = document.createElement("a"); email.href = `mailto:${data.profile.email}`; email.className = "contact-item contact-email"; email.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 7 9-7"/></svg><span></span>'; put(email.querySelector("span"), data.profile.email); email.setAttribute("aria-label", `${c.email}: ${data.profile.email}`);
+    const location = document.createElement("div"); location.className = "contact-item"; location.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span></span>'; put(location.querySelector("span"), text(data.profile.location)); el.contact.append(email, location);
   }
-  function parseRate(value) {
-    const text = value.trim();
-    if (!text) return { valid: false, message: "Enter a deduction rate." };
-    if (!/^\d+(?:\.\d{1,2})?$/.test(text)) return { valid: false, message: "Use a rate from 0 to 100 with up to 2 decimal places." };
-    const [whole, fraction = ""] = text.split(".");
-    const hundredths = Number(whole) * 100 + Number((fraction + "00").slice(0, 2));
-    return hundredths <= 10000 ? { valid: true, hundredths } : { valid: false, message: "Use a deduction rate from 0 to 100%." };
-  }
-  function valuesFor(group) { return Object.fromEntries(inputs.filter((input) => input.dataset.group === group).map((input) => [input.dataset.key, input.value])); }
-  function calculateOffer(values) {
-    const basic = parseCents(values.basic), housing = parseCents(values.housing), transport = parseCents(values.transport), rate = parseRate(values.rate);
-    const checks = { basic, housing, transport, rate };
-    if (Object.values(checks).some((check) => !check.valid)) return { valid: false, checks };
-    const gross = basic.cents + housing.cents + transport.cents;
-    const basis = basic.cents + housing.cents;
-    const deduction = Math.floor((basis * rate.hundredths + 5000) / 10000);
-    return { valid: true, checks, basic: basic.cents, housing: housing.cents, transport: transport.cents, rate: rate.hundredths, gross, basis, deduction, takeHome: gross - deduction };
-  }
-  function setText(name, value) { const node = output(name); if (node) node.textContent = value; }
-  function errorId(group, key) { return group === "plan" ? (key === "bills" ? "monthly-bills-error" : "savings-goal-error") : `${group}-${key}-error`; }
-  function showErrors(group, checks) {
-    Object.entries(checks).forEach(([key, check]) => {
-      const input = document.querySelector(`[data-group="${group}"][data-key="${key}"]`);
-      const error = document.querySelector(`#${errorId(group, key)}`);
-      if (!input || !error) return;
-      input.setAttribute("aria-invalid", String(!check.valid));
-      error.textContent = check.valid ? "" : check.message;
-    });
-  }
-  function renderPrimary(offer) {
-    if (!offer.valid) {
-      ["basic-value", "housing-value", "transport-value", "gross", "basis", "rate-value", "deduction", "take-home"].forEach((key) => setText(`primary-${key}`, "—"));
-      setText("primary-summary", "Fill in all four fields to calculate your take-home pay."); return;
-    }
-    setText("primary-basic-value", formatMoney(offer.basic)); setText("primary-housing-value", formatMoney(offer.housing)); setText("primary-transport-value", formatMoney(offer.transport));
-    setText("primary-gross", formatMoney(offer.gross)); setText("primary-basis", formatMoney(offer.basis)); setText("primary-rate-value", `${(offer.rate / 100).toFixed(2)}%`);
-    setText("primary-deduction", `−${formatMoney(offer.deduction)}`); setText("primary-take-home", formatMoney(offer.takeHome)); setText("primary-summary", "Your monthly pay after the estimated deduction.");
-  }
-  function renderPlan(offer) {
-    const plan = valuesFor("plan"), bills = parseCents(plan.bills), goal = parseCents(plan.goal);
-    showErrors("plan", { bills, goal });
-    if (!offer.valid || !bills.valid || !goal.valid) {
-      setText("savings-months", "—"); setText("savings-message", offer.valid ? "Add valid bills and a savings goal to see your plan." : "Calculate your first offer before planning savings.");
-      setText("savings-take-home", offer.valid ? formatMoney(offer.takeHome) : "—"); setText("savings-bills", bills.valid ? formatMoney(bills.cents) : "—"); setText("savings-available", "—"); return;
-    }
-    const available = offer.takeHome - bills.cents;
-    setText("savings-take-home", formatMoney(offer.takeHome)); setText("savings-bills", formatMoney(bills.cents)); setText("savings-available", formatMoney(available));
-    if (goal.cents === 0) { setText("savings-months", "0 months"); setText("savings-message", "Your savings goal is already met."); }
-    else if (available === 0) { setText("savings-months", "Not reachable yet"); setText("savings-message", "No money remains after bills. Adjust income, bills, or your goal."); }
-    else if (available < 0) { setText("savings-months", "Not reachable yet"); setText("savings-message", `Your monthly bills are ${formatMoney(Math.abs(available))} higher than estimated take-home.`); }
-    else { const months = Math.ceil(goal.cents / available); setText("savings-months", `${months} ${months === 1 ? "month" : "months"}`); setText("savings-message", `Save ${formatMoney(available)} each month to reach ${formatMoney(goal.cents)}.`); }
-  }
-  function renderComparison(primary, second) {
-    setText("comparison-primary", primary.valid ? formatMoney(primary.takeHome) : "—"); setText("comparison-second", second.valid ? formatMoney(second.takeHome) : "—");
-    if (!primary.valid || !second.valid) { setText("comparison-heading", "Ready when you are"); setText("comparison-message", "Add valid numbers for both offers to compare them."); return; }
-    const difference = Math.abs(primary.takeHome - second.takeHome);
-    if (difference === 0) { setText("comparison-heading", "It is a tie"); setText("comparison-message", "Both offers have the same estimated monthly take-home pay."); }
-    else if (primary.takeHome > second.takeHome) { setText("comparison-heading", "Offer 1 comes out ahead"); setText("comparison-message", `Offer 1 has the higher estimated monthly take-home by ${formatMoney(difference)} per month.`); }
-    else { setText("comparison-heading", "Offer 2 comes out ahead"); setText("comparison-message", `Offer 2 has the higher estimated monthly take-home by ${formatMoney(difference)} per month.`); }
-  }
-  function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(inputs.map((input) => [`${input.dataset.group}:${input.dataset.key}`, input.value])))); } catch (_) {} }
-  function restore() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (!saved) return false; inputs.forEach((input) => { const value = saved[`${input.dataset.group}:${input.dataset.key}`]; if (typeof value === "string") input.value = value; }); return true; } catch (_) { return false; } }
-  function loadExample() { if (!window.SAMPLE_DATA) return; inputs.forEach((input) => { input.value = window.SAMPLE_DATA[input.dataset.group][input.dataset.key]; }); save(); render(true); document.querySelector("#planner").scrollIntoView({ behavior: "smooth", block: "start" }); }
-  function render(announce = false) { const primary = calculateOffer(valuesFor("primary")), second = calculateOffer(valuesFor("second")); showErrors("primary", primary.checks); showErrors("second", second.checks); renderPrimary(primary); renderPlan(primary); renderComparison(primary, second); if (announce && primary.valid) liveStatus.textContent = `Estimated monthly take-home is ${formatMoney(primary.takeHome)}.`; }
-  inputs.forEach((input) => { input.addEventListener("input", () => { save(); render(); }); input.addEventListener("blur", () => render(true)); });
-  document.querySelector("#load-example").addEventListener("click", loadExample);
-  if (!restore()) loadExample(); else render();
+  function renderEducation() { el.education.replaceChildren(); data.education.forEach(i => { const e = document.createElement("article"); e.className = "education-entry"; e.innerHTML = "<p class='entry-period'></p><h3></h3><p class='entry-place'></p><p class='entry-detail'></p>"; put(e.querySelector(".entry-period"), text(i.period)); put(e.querySelector("h3"), text(i.degree)); put(e.querySelector(".entry-place"), text(i.institution)); put(e.querySelector(".entry-detail"), text(i.detail)); el.education.append(e); }); }
+  function renderSkills() { el.skills.replaceChildren(); data.skills.forEach(i => { const n = document.createElement("li"); n.textContent = text(i); el.skills.append(n); }); }
+  function renderExperience() { el.experience.replaceChildren(); data.experience.forEach(i => { const e = document.createElement("article"); e.className = "experience-entry"; const h = document.createElement("div"); h.className = "experience-heading"; h.innerHTML = "<div><h3></h3><p></p></div><p class='entry-period'></p>"; put(h.querySelector("h3"), text(i.role)); put(h.querySelector("div p"), text(i.company)); put(h.querySelector(".entry-period"), text(i.period)); const ul = document.createElement("ul"); i.bullets[state.locale].forEach(b => { const li = document.createElement("li"); li.textContent = b; ul.append(li); }); e.append(h, ul); el.experience.append(e); }); }
+  function projects() { return state.filter === "all" ? data.projects : data.projects.filter(p => p.category === state.filter); }
+  function renderFilters() { el.filters.replaceChildren(); Object.entries(data.filters).forEach(([key, label]) => { const b = document.createElement("button"); b.type = "button"; b.className = "filter-button"; b.dataset.filter = key; b.textContent = text(label); const active = state.filter === key; b.setAttribute("aria-pressed", String(active)); if (active) b.classList.add("is-active"); el.filters.append(b); }); el.filters.setAttribute("aria-label", state.locale === "ar" ? "تصفية المشاريع" : "Filter projects"); }
+  function renderProjects() { const c = COPY[state.locale], list = projects(); el.projects.replaceChildren(); el.status.textContent = list.length ? c.showing(list.length) : c.noProjects; list.forEach((p, x) => { const card = document.createElement("article"); card.className = "project-card"; card.innerHTML = `<div class="project-visual visual-${p.visual}" aria-hidden="true"><span>${String(x + 1).padStart(2, "0")}</span><i></i><b></b></div><div class="project-copy"><p class="project-category"></p><h3></h3><p class="project-summary"></p><ul class="technology-list"></ul></div>`; put(card.querySelector(".project-category"), text(data.filters[p.category])); put(card.querySelector("h3"), text(p.title)); put(card.querySelector(".project-summary"), text(p.summary)); p.technologies.forEach(t => { const li = document.createElement("li"); li.textContent = t; card.querySelector(".technology-list").append(li); }); el.projects.append(card); }); }
+  function render() { renderCopy(); renderProfile(); renderEducation(); renderSkills(); renderExperience(); renderFilters(); renderProjects(); }
+  document.addEventListener("click", event => { const l = event.target.closest(".language-button"); if (l) { state.locale = l.dataset.locale; saveLocale(); render(); return; } const f = event.target.closest(".filter-button"); if (f) { state.filter = f.dataset.filter; renderFilters(); renderProjects(); } });
+  el.print.addEventListener("click", () => window.print()); render();
 })();

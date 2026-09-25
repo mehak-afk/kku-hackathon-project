@@ -1,45 +1,41 @@
-# Offer Compass — Salary and Job Offer Planner
+# Bilingual CV Portfolio
 
 ## What it does
 
-Offer Compass turns a monthly salary offer into a transparent take-home estimate. It shows each calculation step, helps plan savings after bills, and compares a second offer side by side.
+A one-page CV and mini portfolio that switches between English and Arabic, including right-to-left Arabic layout. It includes education, experience, skills, project filters, and a **Download PDF** button.
 
 ## Who it is for
 
-Anyone deciding between job offers or checking how a monthly salary, allowances, deductions, bills, and savings goal fit together.
+Anyone who wants to share a short professional CV with English- and Arabic-speaking audiences.
 
-## Needs
+## Privacy
 
-A modern web browser. No internet connection, account, installation, or server is needed. All app files and sample data are included in this folder.
+This template contains fictional, editable placeholder details only. It includes no phone number, ID, address, photo, analytics, external services, or network requests. The selected language is saved only in the browser through local storage.
 
 ## How to run it
 
-1. Download or open this project folder.
+1. Open this project folder.
 2. Double-click `index.html`.
-3. Enter your own monthly figures. Your inputs are saved only in this browser using local storage; they are never sent to GitHub or another service.
+3. Select **English** or **العربية**.
+4. Select **Download PDF** and choose **Save as PDF** in the browser print dialog.
+5. For the cleanest PDF, choose A4 / portrait, enable background graphics, and turn off headers and footers.
 
-Money inputs are numbers, not text, so `9000 + 500` is correctly calculated as `9,500.00`.
+No installation, account, internet connection, build step, or server is needed.
 
-### How take-home pay is calculated
+## Edit the CV safely
 
-- Gross monthly pay = basic salary + housing allowance + transport allowance.
-- Deduction basis = basic salary + housing allowance.
-- Deduction = deduction basis × deduction rate.
-- Estimated take-home = gross monthly pay − deduction.
+Open `sample-data/data.js` in a text editor and replace the clearly marked placeholder values. Every visible phrase has both `en` and `ar` versions. Keep personal details limited to information you are happy to publish; email is enough for contact—do not add phone numbers or ID numbers.
 
-Each amount is rounded to two decimal places. The planner rounds the deduction first, then subtracts it from gross pay so every displayed step matches the final total.
+## Try the sample data
 
-## Try it with the sample data
+The template loads its fictional built-in sample CV from `sample-data/data.js` using a normal script tag, so it works when `index.html` is opened directly from a folder.
 
-Click **Load example** at any time to restore fictional built-in numbers. The required first-offer example is:
+## Demo Day flow
 
-- Basic salary: `7,000`
-- Housing allowance: `1,750`
-- Transport allowance: `700`
-- Deduction rate: `9.75%`
-- Estimated take-home: `8,596.87`
-
-For a quick demo, load the example, change the basic salary, then choose **Compare a second offer** to jump to Level 3. For savings, the planner assumes you save all positive money left after monthly bills; it does not model interest, debt, investment returns, or future pay changes.
+1. Open `index.html`.
+2. Click **العربية** and show the page switch to right-to-left Arabic.
+3. Filter the projects by skill area.
+4. Click **تنزيل PDF**, then choose **Save as PDF** in the print dialog to demonstrate the one-page CV.
 
 Built with Claude Code during the KKU Claude Code hackathon
 Started on 2026-09-25

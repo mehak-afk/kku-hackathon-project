@@ -1,1 +1,1 @@
-Made-up example data goes here. No real people.
+Fictional bilingual CV example data lives in data.js. Edit that file to replace the placeholder English and Arabic content. Do not add phone numbers, ID numbers, or private details you would not want published.
